@@ -29,12 +29,12 @@ STEPS = [
     {"key": "shortlist", "name": "Bidder Shortlist Agreed", "default_days": 10, "min_days": 2, "max_days": 45},
     {"key": "package_prepared", "name": "Scope & RFP Package Prepared", "default_days": 10, "min_days": 2, "max_days": 60},
     {"key": "package_approved", "name": "Scope & RFP Package Approved", "default_days": 5, "min_days": 1, "max_days": 30},
-    {"key": "rfp_issued", "name": "RFP Issued", "default_days": 30, "min_days": 5, "max_days": 120, "required": True},
+    {"key": "rfp_issued", "name": "RFP Issued", "default_days": 30, "min_days": 5, "max_days": 120},
     {"key": "proposals", "name": "Proposals Levels & Analysed", "default_days": 15, "min_days": 3, "max_days": 60},
     {"key": "bidder_selection", "name": "Bidder Selection", "default_days": 5, "min_days": 1, "max_days": 30},
     {"key": "funding", "name": "Scope of RFP Funding Approval", "default_days": 20, "min_days": 5, "max_days": 90},
     {"key": "contract", "name": "Bidder Contract Execution", "default_days": 30, "min_days": 5, "max_days": 120},
-    {"key": "construction", "name": "Construction & Commissioning", "default_days": 365, "min_days": 5, "max_days": 1825, "step": 5, "required": True},
+    {"key": "construction", "name": "Construction & Commissioning", "default_days": 365, "min_days": 5, "max_days": 1825, "step": 5},
 ]
 
 INFO_REQUEST_DEFAULTS = {"due": 10, "answered": 5}
@@ -72,16 +72,12 @@ with st.sidebar:
 
     # Build per-step controls (include toggle + duration slider)
     step_controls = []
-    rfp_issue_config = None
+    info_due_value = 0
+    info_answered_value = 0
     for s in STEPS:
         col1, col2 = st.columns([1, 2])
         with col1:
-            checkbox_kwargs = {"value": True, "key": f"inc_{s['key']}"}
-            if s.get("required"):
-                checkbox_kwargs["disabled"] = True
-            include = st.checkbox("Include", **checkbox_kwargs)
-            if s.get("required"):
-                include = True
+            include = st.checkbox("Include", value=True, key=f"inc_{s['key']}")
         with col2:
             min_days = int(s.get("min_days", 1))
             max_days = int(s.get("max_days", 60))
@@ -103,6 +99,42 @@ with st.sidebar:
                 step=step_size,
                 key=f"slider_{s['key']}",
             )
+            if s["key"] == "rfp_issued":
+                rfp_issue_span = int(dur)
+                due_default = int(round(INFO_REQUEST_DEFAULTS["due"] * scale))
+                due_default = max(0, min(default_days, due_default))
+                due_key = "slider_info_due"
+                if due_key in st.session_state:
+                    st.session_state[due_key] = max(0, min(rfp_issue_span, int(st.session_state[due_key])))
+                    due_initial_value = int(st.session_state[due_key])
+                else:
+                    due_initial_value = min(due_default, rfp_issue_span)
+                info_due_value = render_styled_slider(
+                    "RFP Information Requests Due",
+                    0,
+                    rfp_issue_span,
+                    due_initial_value,
+                    key=due_key,
+                    help="Working days from RFP issue until questions close.",
+                )
+
+                answered_max = max(0, rfp_issue_span - int(info_due_value))
+                answer_default = int(round(INFO_REQUEST_DEFAULTS["answered"] * scale))
+                answer_default = max(0, min(answered_max, answer_default))
+                answered_key = "slider_info_answered"
+                if answered_key in st.session_state:
+                    st.session_state[answered_key] = max(0, min(answered_max, int(st.session_state[answered_key])))
+                    answered_initial = int(st.session_state[answered_key])
+                else:
+                    answered_initial = answer_default
+                info_answered_value = render_styled_slider(
+                    "RFP Information Requests Answered",
+                    0,
+                    answered_max,
+                    answered_initial,
+                    key=answered_key,
+                    help="Working days after questions close to deliver responses.",
+                )
         ctrl = {
             "name": s["name"],
             "key": s["key"],
@@ -110,38 +142,8 @@ with st.sidebar:
             "days": int(dur) if include else 0,
             "raw_days": int(dur),
         }
-        if s.get("required"):
-            ctrl["include"] = True
-            ctrl["days"] = int(dur)
         step_controls.append(ctrl)
-        if s["key"] == "rfp_issued":
-            rfp_issue_config = ctrl
-
-    rfp_issue_span = int(rfp_issue_config.get("raw_days", 0)) if rfp_issue_config else 0
-    scaled_due_default = int(round(INFO_REQUEST_DEFAULTS["due"] * scale))
-    scaled_due_default = max(0, min(rfp_issue_span, scaled_due_default))
-    info_due = render_styled_slider(
-        "RFP Information Requests Due",
-        0,
-        rfp_issue_span,
-        scaled_due_default,
-        key="slider_info_due",
-        help="Working days from RFP issue until questions close.",
-    )
-
-    answered_max = max(0, rfp_issue_span - int(info_due))
-    scaled_answer_default = int(round(INFO_REQUEST_DEFAULTS["answered"] * scale))
-    scaled_answer_default = max(0, min(answered_max, scaled_answer_default))
-    info_answered = render_styled_slider(
-        "RFP Information Requests Answered",
-        0,
-        answered_max,
-        scaled_answer_default,
-        key="slider_info_answered",
-        help="Working days after questions close to deliver responses.",
-    )
-
-    info_controls = {"due_days": int(info_due), "answered_days": int(info_answered)}
+    info_controls = {"due_days": int(info_due_value), "answered_days": int(info_answered_value)}
 
 # Holidays pre‑expansion (covers a generous multi‑year span)
 years = list(range( date_utils.date.today().year-1, 2041 ))
@@ -151,7 +153,14 @@ def forward_schedule(start_date, controls, info_controls):
     """Return list of dict rows with Start/Finish for each included step, working days only."""
     rows = []
     current = start_date
-    milestones = {"rfp_closed": None, "info_due": None, "info_answered": None}
+    milestones = {
+        "rfp_issue_start": None,
+        "rfp_closed": None,
+        "info_due": None,
+        "info_answered": None,
+        "onboarding_complete": None,
+        "construction_complete": None,
+    }
     for ctrl in controls:
         if not ctrl["include"]:
             continue
@@ -165,6 +174,7 @@ def forward_schedule(start_date, controls, info_controls):
             "Duration (work days)": duration,
         })
         if ctrl.get("key") == "rfp_issued":
+            milestones["rfp_issue_start"] = s_start
             due_days = int(info_controls.get("due_days", 0) or 0)
             answered_days = int(info_controls.get("answered_days", 0) or 0)
             due_date = date_utils.add_workdays(s_start, due_days, HOLIDAYS, workdays_per_week=5)
@@ -184,6 +194,10 @@ def forward_schedule(start_date, controls, info_controls):
             milestones["rfp_closed"] = s_finish
             milestones["info_due"] = due_date
             milestones["info_answered"] = answered_finish
+        if ctrl.get("key") == "contract":
+            milestones["onboarding_complete"] = s_finish
+        if ctrl.get("key") == "construction":
+            milestones["construction_complete"] = s_finish
         current = s_finish
     return rows, milestones
 
@@ -192,7 +206,14 @@ def backward_schedule(target_end, controls, info_controls):
     """Work backward from target_end. Returns rows ordered in the natural forward sequence."""
     reversed_steps = [c for c in controls if c["include"]][::-1]
     rows = []
-    milestones = {"rfp_closed": None, "info_due": None, "info_answered": None}
+    milestones = {
+        "rfp_issue_start": None,
+        "rfp_closed": None,
+        "info_due": None,
+        "info_answered": None,
+        "onboarding_complete": None,
+        "construction_complete": None,
+    }
     current_finish = target_end
     for ctrl in reversed_steps:
         duration = int(ctrl["days"])
@@ -204,26 +225,33 @@ def backward_schedule(target_end, controls, info_controls):
             "Duration (work days)": duration,
         }
         if ctrl.get("key") == "rfp_issued":
+            milestones["rfp_issue_start"] = s_start
             due_days = int(info_controls.get("due_days", 0) or 0)
             answered_days = int(info_controls.get("answered_days", 0) or 0)
             due_date = date_utils.add_workdays(s_start, due_days, HOLIDAYS, workdays_per_week=5)
             answered_finish = date_utils.add_workdays(due_date, answered_days, HOLIDAYS, workdays_per_week=5)
-            info_answered_row = {
-                "Step": "RFP Information Requests Answered",
-                "Start": due_date,
-                "Finish": answered_finish,
-                "Duration (work days)": answered_days,
-            }
             info_due_row = {
                 "Step": "RFP Information Requests Due",
                 "Start": s_start,
                 "Finish": due_date,
                 "Duration (work days)": due_days,
             }
-            rows.extend([info_answered_row, info_due_row, row])
+            info_answered_row = {
+                "Step": "RFP Information Requests Answered",
+                "Start": due_date,
+                "Finish": answered_finish,
+                "Duration (work days)": answered_days,
+            }
+            rows.extend([info_due_row, info_answered_row, row])
             milestones["rfp_closed"] = current_finish
             milestones["info_due"] = due_date
             milestones["info_answered"] = answered_finish
+        elif ctrl.get("key") == "contract":
+            milestones["onboarding_complete"] = current_finish
+            rows.append(row)
+        elif ctrl.get("key") == "construction":
+            milestones["construction_complete"] = current_finish
+            rows.append(row)
         else:
             rows.append(row)
         current_finish = s_start
@@ -255,16 +283,56 @@ for msg in alerts:
 def format_card_value(value):
     return value if value is not None else "—"
 
-colA, colB, colC, colD = st.columns(4)
+colA, colB, colC, colD, colE = st.columns(5)
 with colA:
-    st.markdown(render_kpi_card({"building_name":"Vendor Onboarding","start":format_card_value(recommended_start)}, "Start", "start"), unsafe_allow_html=True)
+    st.markdown(
+        render_kpi_card(
+            {"building_name": "Vendor Onboarding", "start": format_card_value(recommended_start)},
+            "Vendor Onboarding Start",
+            "start",
+        ),
+        unsafe_allow_html=True,
+    )
 with colB:
-    st.markdown(render_kpi_card({"building_name":"Vendor Onboarding","rfp_closed":format_card_value(rfp_closed)}, "RFP Closed", "rfp_closed"), unsafe_allow_html=True)
+    rfp_issue_start = milestones.get("rfp_issue_start")
+    st.markdown(
+        render_kpi_card(
+            {"building_name": "Vendor Onboarding", "rfp_issue": format_card_value(rfp_issue_start)},
+            "Vendor Onboarding RFP Issued",
+            "rfp_issue",
+        ),
+        unsafe_allow_html=True,
+    )
 with colC:
-    st.markdown(render_kpi_card({"building_name":"Vendor Onboarding","end":format_card_value(recommended_finish)}, "Complete", "end"), unsafe_allow_html=True)
+    st.markdown(
+        render_kpi_card(
+            {"building_name": "Vendor Onboarding", "rfp_closed": format_card_value(rfp_closed)},
+            "Vendor Onboarding RFP Closed",
+            "rfp_closed",
+        ),
+        unsafe_allow_html=True,
+    )
 with colD:
-    total_days = sum(c["days"] for c in step_controls if c["include"])
-    st.markdown(render_kpi_card({"building_name":"Vendor Onboarding","days":total_days}, "Total (working days)", "days"), unsafe_allow_html=True)
+    onboarding_complete = milestones.get("onboarding_complete")
+    st.markdown(
+        render_kpi_card(
+            {"building_name": "Vendor Onboarding", "onboarding_complete": format_card_value(onboarding_complete)},
+            "Vendor Onboarding Complete",
+            "onboarding_complete",
+        ),
+        unsafe_allow_html=True,
+    )
+with colE:
+    construction_complete = milestones.get("construction_complete", recommended_finish)
+    st.markdown(
+        render_kpi_card(
+            {"building_name": "Vendor Onboarding", "construction_complete": format_card_value(construction_complete)},
+            "Construction Complete",
+            "construction_complete",
+        ),
+        unsafe_allow_html=True,
+    )
+
 
 st.divider()
 
