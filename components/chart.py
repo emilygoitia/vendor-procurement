@@ -17,9 +17,15 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
         st.info("Add at least one step to see the schedule timeline.")
         return
 
+    # Always display tasks from the earliest start date at the top of the chart.
+    sorted_tasks = (
+        tasks_df.sort_values(by=["Start", "Finish", "Step"], ascending=[True, True, True])
+        .reset_index(drop=True)
+    )
+
     # Build the base timeline with a consistent Mano Blue bar colour.
     timeline_fig = px.timeline(
-        tasks_df,
+        sorted_tasks,
         x_start="Start",
         x_end="Finish",
         y="Step",
@@ -35,9 +41,11 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
     )
 
     # Keep the explicit order of tasks as defined in the dataframe.
-    ordered_steps = list(dict.fromkeys(tasks_df["Step"].tolist()))
-    if milestone_points:
-        ordered_steps.append(milestone_track_label)
+    ordered_steps = list(dict.fromkeys(sorted_tasks["Step"].tolist()))
+
+    def ensure_step(step_name):
+        if step_name not in ordered_steps:
+            ordered_steps.append(step_name)
 
     # Add milestone markers as scatter traces.
     for point in milestone_points:
@@ -46,10 +54,12 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
             continue
         label = point.get("label", "Milestone")
         color = point.get("color", colors.MANO_BLUE)
+        y_value = point.get("step") or milestone_track_label
+        ensure_step(y_value)
         timeline_fig.add_trace(
             go.Scatter(
                 x=[milestone_date],
-                y=[milestone_track_label],
+                y=[y_value],
                 mode="markers",
                 marker=dict(color=color, size=14, symbol="circle", line=dict(color="#FFFFFF", width=2)),
                 name=label,
