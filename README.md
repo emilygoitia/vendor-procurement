@@ -12,5 +12,5 @@ https://rfs-calculator.streamlit.app/
 pip install -r requirements.txt    # or: py -m pip install -r requirements.txt
 
 # 2) Run
-streamlit run rfs_calculator_app_mano_default_equipment.py
-# If PATH issues: py -m streamlit run rfs_calculator_app_mano_default_equipment.py
+streamlit run vendor_onboarding_calculator.py
+# If PATH issues: py -m streamlit run vendor_onboarding_calculator.py
