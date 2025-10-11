@@ -297,6 +297,13 @@ MILESTONE_COLORS = {
     "construction_complete": colors.MILESTONE_CONSTRUCTION_COMPLETE,
 }
 
+MILESTONE_STEP_LABELS = {
+    "rfp_issue": "RFP Issued",
+    "rfp_closed": "RFP Issued",
+    "onboarding_complete": "Bidder Contract Execution",
+    "construction_complete": "Construction & Commissioning",
+}
+
 milestone_cards = [
     {
         "column": "start",
@@ -347,6 +354,7 @@ for col, card in zip(columns, milestone_cards):
 cards_by_column = {card["column"]: card for card in milestone_cards}
 
 result_df = pd.DataFrame(rows)
+result_steps = set(result_df["Step"].tolist()) if not result_df.empty else set()
 
 milestone_points = []
 first_step_name = result_df.iloc[0]["Step"] if not result_df.empty else None
@@ -366,12 +374,16 @@ for key in ["rfp_issue", "rfp_closed", "onboarding_complete", "construction_comp
     card = cards_by_column.get(key)
     if not card or not card.get("date"):
         continue
+    step_name = MILESTONE_STEP_LABELS.get(key)
+    if step_name not in result_steps:
+        step_name = None
     milestone_points.append(
         {
             "label": card["label"],
             "date": card["date"],
             "color": MILESTONE_COLORS.get(card["column"]),
             "align": "finish",
+            "step": step_name,
         }
     )
 
