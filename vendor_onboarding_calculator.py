@@ -4,7 +4,6 @@ import pandas as pd
 # Reuse existing Mano components and utilities
 from components.table import render_styled_table
 from components.card import render_kpi_card
-from components.chart import render_gantt
 try:
     from components.slider import render_styled_slider
 except Exception:
@@ -38,6 +37,9 @@ STEPS = [
     {"key": "construction", "name": "Construction & Commissioning", "default_days": 365, "min_days": 5, "max_days": 1825, "step": 5},
 ]
 
+INFO_REQUEST_DEFAULTS = {"due": 10, "answered": 5}
+
+
 st.set_page_config(page_title="Vendor Onboarding Calculator", layout="wide")
 styling.inject_custom_css()
 st.logo("./assets/images/Mano_Logo_Main.svg", icon_image="./assets/images/Mano_Mark_Mark.svg")
@@ -70,6 +72,8 @@ with st.sidebar:
 
     # Build per-step controls (include toggle + duration slider)
     step_controls = []
+    info_due_value = 0
+    info_answered_value = 0
     for s in STEPS:
         col1, col2 = st.columns([1, 2])
         with col1:
@@ -95,6 +99,42 @@ with st.sidebar:
                 step=step_size,
                 key=f"slider_{s['key']}",
             )
+            if s["key"] == "rfp_issued":
+                rfp_issue_span = int(dur)
+                due_default = int(round(INFO_REQUEST_DEFAULTS["due"] * scale))
+                due_default = max(0, min(default_days, due_default))
+                due_key = "slider_info_due"
+                if due_key in st.session_state:
+                    stored_due = int(st.session_state[due_key])
+                    due_initial_value = max(0, min(rfp_issue_span, stored_due))
+                else:
+                    due_initial_value = min(due_default, rfp_issue_span)
+                info_due_value = render_styled_slider(
+                    "RFP Information Requests Due",
+                    0,
+                    rfp_issue_span,
+                    due_initial_value,
+                    key=due_key,
+                    help="Working days from RFP issue until questions close.",
+                )
+
+                answered_max = max(0, rfp_issue_span - int(info_due_value))
+                answer_default = int(round(INFO_REQUEST_DEFAULTS["answered"] * scale))
+                answer_default = max(0, min(answered_max, answer_default))
+                answered_key = "slider_info_answered"
+                if answered_key in st.session_state:
+                    stored_answered = int(st.session_state[answered_key])
+                    answered_initial = max(0, min(answered_max, stored_answered))
+                else:
+                    answered_initial = answer_default
+                info_answered_value = render_styled_slider(
+                    "RFP Information Requests Answered",
+                    0,
+                    answered_max,
+                    answered_initial,
+                    key=answered_key,
+                    help="Working days after questions close to deliver responses.",
+                )
         ctrl = {
             "name": s["name"],
             "key": s["key"],
@@ -103,18 +143,21 @@ with st.sidebar:
             "raw_days": int(dur),
         }
         step_controls.append(ctrl)
+    info_controls = {"due_days": int(info_due_value), "answered_days": int(info_answered_value)}
 
 # Holidays pre‑expansion (covers a generous multi‑year span)
 years = list(range( date_utils.date.today().year-1, 2041 ))
 HOLIDAYS = date_utils.expand_holidays(country, years)
 
-def forward_schedule(start_date, controls):
+def forward_schedule(start_date, controls, info_controls):
     """Return list of dict rows with Start/Finish for each included step, working days only."""
     rows = []
     current = start_date
     milestones = {
         "rfp_issue_start": None,
         "rfp_closed": None,
+        "info_due": None,
+        "info_answered": None,
         "onboarding_complete": None,
         "construction_complete": None,
     }
@@ -129,11 +172,28 @@ def forward_schedule(start_date, controls):
             "Start": s_start,
             "Finish": s_finish,
             "Duration (work days)": duration,
-            "Category": "Vendor Onboarding Step",
         })
         if ctrl.get("key") == "rfp_issued":
             milestones["rfp_issue_start"] = s_start
+            due_days = int(info_controls.get("due_days", 0) or 0)
+            answered_days = int(info_controls.get("answered_days", 0) or 0)
+            due_date = date_utils.add_workdays(s_start, due_days, HOLIDAYS, workdays_per_week=5)
+            answered_finish = date_utils.add_workdays(due_date, answered_days, HOLIDAYS, workdays_per_week=5)
+            rows.append({
+                "Step": "RFP Information Requests Due",
+                "Start": s_start,
+                "Finish": due_date,
+                "Duration (work days)": due_days,
+            })
+            rows.append({
+                "Step": "RFP Information Requests Answered",
+                "Start": due_date,
+                "Finish": answered_finish,
+                "Duration (work days)": answered_days,
+            })
             milestones["rfp_closed"] = s_finish
+            milestones["info_due"] = due_date
+            milestones["info_answered"] = answered_finish
         if ctrl.get("key") == "contract":
             milestones["onboarding_complete"] = s_finish
         if ctrl.get("key") == "construction":
@@ -142,13 +202,15 @@ def forward_schedule(start_date, controls):
     return rows, milestones
 
 
-def backward_schedule(target_end, controls):
+def backward_schedule(target_end, controls, info_controls):
     """Work backward from target_end. Returns rows ordered in the natural forward sequence."""
     reversed_steps = [c for c in controls if c["include"]][::-1]
     rows = []
     milestones = {
         "rfp_issue_start": None,
         "rfp_closed": None,
+        "info_due": None,
+        "info_answered": None,
         "onboarding_complete": None,
         "construction_complete": None,
     }
@@ -161,12 +223,29 @@ def backward_schedule(target_end, controls):
             "Start": s_start,
             "Finish": current_finish,
             "Duration (work days)": duration,
-            "Category": "Vendor Onboarding Step",
         }
         if ctrl.get("key") == "rfp_issued":
             milestones["rfp_issue_start"] = s_start
-            rows.append(row)
+            due_days = int(info_controls.get("due_days", 0) or 0)
+            answered_days = int(info_controls.get("answered_days", 0) or 0)
+            due_date = date_utils.add_workdays(s_start, due_days, HOLIDAYS, workdays_per_week=5)
+            answered_finish = date_utils.add_workdays(due_date, answered_days, HOLIDAYS, workdays_per_week=5)
+            info_due_row = {
+                "Step": "RFP Information Requests Due",
+                "Start": s_start,
+                "Finish": due_date,
+                "Duration (work days)": due_days,
+            }
+            info_answered_row = {
+                "Step": "RFP Information Requests Answered",
+                "Start": due_date,
+                "Finish": answered_finish,
+                "Duration (work days)": answered_days,
+            }
+            rows.extend([info_due_row, info_answered_row, row])
             milestones["rfp_closed"] = current_finish
+            milestones["info_due"] = due_date
+            milestones["info_answered"] = answered_finish
         elif ctrl.get("key") == "contract":
             milestones["onboarding_complete"] = current_finish
             rows.append(row)
@@ -182,11 +261,11 @@ def backward_schedule(target_end, controls):
 st.title("Vendor Onboarding Calculator")
 
 if mode == "Start Date → End Date":
-    rows, milestones = forward_schedule(start_date, step_controls)
+    rows, milestones = forward_schedule(start_date, step_controls, info_controls)
     recommended_start = start_date
     recommended_finish = rows[-1]["Finish"] if rows else start_date
 else:
-    rows, milestones = backward_schedule(target_end, step_controls)
+    rows, milestones = backward_schedule(target_end, step_controls, info_controls)
     recommended_start = rows[0]["Start"] if rows else target_end
     recommended_finish = target_end
 
@@ -194,6 +273,10 @@ rfp_closed = milestones.get("rfp_closed")
 alerts = []
 if required_completion and recommended_finish and recommended_finish > required_completion:
     alerts.append(f"Construction completes on {recommended_finish} which is after the required completion date of {required_completion}. Adjust durations or move the start date.")
+if rfp_closed and milestones.get("info_due") and milestones["info_due"] > rfp_closed:
+    alerts.append(f"RFP information requests are due on {milestones['info_due']} but the RFP closes on {rfp_closed}. Extend the RFP Issued window or move the due date earlier.")
+if rfp_closed and milestones.get("info_answered") and milestones["info_answered"] > rfp_closed:
+    alerts.append(f"RFP information request answers finish on {milestones['info_answered']} but the RFP closes on {rfp_closed}. Adjust durations so answers are complete before closing.")
 for msg in alerts:
     st.error(msg)
 
@@ -253,30 +336,11 @@ with colE:
 
 st.divider()
 
-columns = ["Step", "Start", "Finish", "Duration (work days)", "Category"]
-result_df = pd.DataFrame(rows, columns=columns)
-timeline_df = result_df.copy()
-if not timeline_df.empty:
-    timeline_df["Start"] = pd.to_datetime(timeline_df["Start"])
-    timeline_df["Finish"] = pd.to_datetime(timeline_df["Finish"])
-
-st.subheader("Timeline View")
-render_gantt(timeline_df)
-
-st.subheader("Schedule Details")
-display_columns = ["Step", "Category", "Start", "Finish", "Duration (work days)"]
-if set(display_columns).issubset(timeline_df.columns):
-    display_df = timeline_df[display_columns]
-else:
-    display_df = timeline_df
-render_styled_table(display_df)
+result_df = pd.DataFrame(rows)
+# Results Table
+render_styled_table(result_df)
 
 # Download
-st.download_button(
-    "Download Schedule (CSV)",
-    display_df.to_csv(index=False).encode("utf-8"),
-    "vendor_onboarding_schedule.csv",
-    "text/csv",
-)
+st.download_button("Download Schedule (CSV)", result_df.to_csv(index=False).encode("utf-8"), "vendor_onboarding_schedule.csv", "text/csv")
 
 st.markdown('<p class="small-muted">Notes: Columns F and G from the source planning sheet are informational and not included in duration math. Durations are working days (Mon–Fri) with standard public holidays applied per country.</p>', unsafe_allow_html=True)
