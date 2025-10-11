@@ -320,7 +320,7 @@ def format_card_value(value):
 MILESTONE_COLORS = {
     "start": colors.MILESTONE_START,
     "rfp_issued": colors.MILESTONE_RFP_ISSUE,
-    "rfp_open": colors.MILESTONE_RFP_ISSUE,
+    "rfp_open": colors.MILESTONE_RFP_OPEN,
     "rfp_closed": colors.MILESTONE_RFP_CLOSED,
     "onboarding_complete": colors.MILESTONE_ONBOARDING_COMPLETE,
     "construction_complete": colors.MILESTONE_CONSTRUCTION_COMPLETE,
@@ -337,37 +337,37 @@ MILESTONE_STEP_LABELS = {
 milestone_cards = [
     {
         "column": "start",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Vendor Onboarding Start",
         "date": recommended_start,
     },
     {
         "column": "rfp_issued",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Vendor Onboarding RFP Issued",
         "date": milestones.get("rfp_issue_start"),
     },
     {
         "column": "rfp_open",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Vendor Onboarding RFP Open",
         "date": milestones.get("rfp_issue_start"),
     },
     {
         "column": "rfp_closed",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Vendor Onboarding RFP Closed",
         "date": rfp_closed,
     },
     {
         "column": "onboarding_complete",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Vendor Onboarding Complete",
         "date": milestones.get("onboarding_complete"),
     },
     {
         "column": "construction_complete",
-        "title": "Vendor Onboarding",
+        "title": "",
         "label": "Construction Complete",
         "date": milestones.get("construction_complete", recommended_finish),
     },
@@ -379,7 +379,7 @@ for col, card in zip(columns, milestone_cards):
         display_value = format_card_value(card["date"])
         st.markdown(
             render_kpi_card(
-                card["title"],
+                card.get("title"),
                 card["label"],
                 display_value,
                 MILESTONE_COLORS.get(card["column"]),
