@@ -30,7 +30,7 @@ STEPS = [
     {"key": "shortlist", "name": "Bidder Shortlist Agreed", "default_days": 10, "min_days": 2, "max_days": 45},
     {"key": "package_prepared", "name": "Scope & RFP Package Prepared", "default_days": 10, "min_days": 2, "max_days": 60},
     {"key": "package_approved", "name": "Scope & RFP Package Approved", "default_days": 5, "min_days": 1, "max_days": 30},
-    {"key": "rfp_issued", "name": "RFP Issued", "default_days": 30, "min_days": 5, "max_days": 120},
+    {"key": "rfp_issued", "name": "RFP Open", "default_days": 30, "min_days": 5, "max_days": 120},
     {"key": "proposals", "name": "Proposals Levels & Analysed", "default_days": 15, "min_days": 3, "max_days": 60},
     {"key": "bidder_selection", "name": "Bidder Selection", "default_days": 5, "min_days": 1, "max_days": 30},
     {"key": "funding", "name": "Scope of RFP Funding Approval", "default_days": 20, "min_days": 5, "max_days": 90},
@@ -275,7 +275,7 @@ alerts = []
 if required_completion and recommended_finish and recommended_finish > required_completion:
     alerts.append(f"Construction completes on {recommended_finish} which is after the required completion date of {required_completion}. Adjust durations or move the start date.")
 if rfp_closed and milestones.get("info_due") and milestones["info_due"] > rfp_closed:
-    alerts.append(f"RFP information requests are due on {milestones['info_due']} but the RFP closes on {rfp_closed}. Extend the RFP Issued window or move the due date earlier.")
+    alerts.append(f"RFP information requests are due on {milestones['info_due']} but the RFP closes on {rfp_closed}. Extend the RFP Open window or move the due date earlier.")
 if rfp_closed and milestones.get("info_answered") and milestones["info_answered"] > rfp_closed:
     alerts.append(f"RFP information request answers finish on {milestones['info_answered']} but the RFP closes on {rfp_closed}. Adjust durations so answers are complete before closing.")
 if mode == "End Date → Start Recommendation" and recommended_start and recommended_start < date_utils.date.today():
@@ -319,15 +319,17 @@ def format_card_value(value):
 
 MILESTONE_COLORS = {
     "start": colors.MILESTONE_START,
-    "rfp_issue": colors.MILESTONE_RFP_ISSUE,
+    "rfp_issued": colors.MILESTONE_RFP_ISSUE,
+    "rfp_open": colors.MILESTONE_RFP_ISSUE,
     "rfp_closed": colors.MILESTONE_RFP_CLOSED,
     "onboarding_complete": colors.MILESTONE_ONBOARDING_COMPLETE,
     "construction_complete": colors.MILESTONE_CONSTRUCTION_COMPLETE,
 }
 
 MILESTONE_STEP_LABELS = {
-    "rfp_issue": "RFP Issued",
-    "rfp_closed": "RFP Issued",
+    "rfp_issued": "RFP Open",
+    "rfp_open": "RFP Open",
+    "rfp_closed": "RFP Open",
     "onboarding_complete": "Bidder Contract Execution",
     "construction_complete": "Construction & Commissioning",
 }
@@ -340,9 +342,15 @@ milestone_cards = [
         "date": recommended_start,
     },
     {
-        "column": "rfp_issue",
+        "column": "rfp_issued",
         "title": "Vendor Onboarding",
         "label": "Vendor Onboarding RFP Issued",
+        "date": milestones.get("rfp_issue_start"),
+    },
+    {
+        "column": "rfp_open",
+        "title": "Vendor Onboarding",
+        "label": "Vendor Onboarding RFP Open",
         "date": milestones.get("rfp_issue_start"),
     },
     {
@@ -398,19 +406,20 @@ if start_card and start_card.get("date") and first_step_name:
         }
     )
 
-for key in ["rfp_issue", "rfp_closed", "onboarding_complete", "construction_complete"]:
+for key in ["rfp_issued", "rfp_open", "rfp_closed", "onboarding_complete", "construction_complete"]:
     card = cards_by_column.get(key)
     if not card or not card.get("date"):
         continue
     step_name = MILESTONE_STEP_LABELS.get(key)
     if step_name not in result_steps:
         step_name = None
+    align = "start" if key == "rfp_issued" else "finish"
     milestone_points.append(
         {
             "label": card["label"],
             "date": card["date"],
             "color": MILESTONE_COLORS.get(card["column"]),
-            "align": "finish",
+            "align": align,
             "step": step_name,
         }
     )
