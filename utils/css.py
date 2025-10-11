@@ -188,6 +188,25 @@ def inject_custom_css():
         border-left: 6px solid var(--mano-blue);
         box-shadow: 0 2px 10px rgba(0,0,0,0.05);
       }}
+      .kpi-card-header {{
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+      }}
+      .kpi-card-header > div {{
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+      }}
+      .milestone-dot {{
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        display: inline-block;
+        flex-shrink: 0;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.05);
+      }}
       .kpi-card p {{
         margin: 0;
         font-weight: 500;

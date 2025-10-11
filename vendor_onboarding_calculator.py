@@ -4,6 +4,7 @@ import pandas as pd
 # Reuse existing Mano components and utilities
 from components.table import render_styled_table
 from components.card import render_kpi_card
+from components.chart import render_schedule_gantt
 try:
     from components.slider import render_styled_slider
 except Exception:
@@ -281,62 +282,84 @@ for msg in alerts:
     st.error(msg)
 
 def format_card_value(value):
-    return value if value is not None else "—"
+    if value is None:
+        return "—"
+    if isinstance(value, date_utils.date):
+        return value.strftime("%b %d, %Y")
+    return value
 
-colA, colB, colC, colD, colE = st.columns(5)
-with colA:
-    st.markdown(
-        render_kpi_card(
-            {"building_name": "Vendor Onboarding", "start": format_card_value(recommended_start)},
-            "Vendor Onboarding Start",
-            "start",
-        ),
-        unsafe_allow_html=True,
-    )
-with colB:
-    rfp_issue_start = milestones.get("rfp_issue_start")
-    st.markdown(
-        render_kpi_card(
-            {"building_name": "Vendor Onboarding", "rfp_issue": format_card_value(rfp_issue_start)},
-            "Vendor Onboarding RFP Issued",
-            "rfp_issue",
-        ),
-        unsafe_allow_html=True,
-    )
-with colC:
-    st.markdown(
-        render_kpi_card(
-            {"building_name": "Vendor Onboarding", "rfp_closed": format_card_value(rfp_closed)},
-            "Vendor Onboarding RFP Closed",
-            "rfp_closed",
-        ),
-        unsafe_allow_html=True,
-    )
-with colD:
-    onboarding_complete = milestones.get("onboarding_complete")
-    st.markdown(
-        render_kpi_card(
-            {"building_name": "Vendor Onboarding", "onboarding_complete": format_card_value(onboarding_complete)},
-            "Vendor Onboarding Complete",
-            "onboarding_complete",
-        ),
-        unsafe_allow_html=True,
-    )
-with colE:
-    construction_complete = milestones.get("construction_complete", recommended_finish)
-    st.markdown(
-        render_kpi_card(
-            {"building_name": "Vendor Onboarding", "construction_complete": format_card_value(construction_complete)},
-            "Construction Complete",
-            "construction_complete",
-        ),
-        unsafe_allow_html=True,
-    )
+
+MILESTONE_COLORS = {
+    "start": colors.MILESTONE_START,
+    "rfp_issue": colors.MILESTONE_RFP_ISSUE,
+    "rfp_closed": colors.MILESTONE_RFP_CLOSED,
+    "onboarding_complete": colors.MILESTONE_ONBOARDING_COMPLETE,
+    "construction_complete": colors.MILESTONE_CONSTRUCTION_COMPLETE,
+}
+
+milestone_cards = [
+    {
+        "column": "start",
+        "title": "Vendor Onboarding",
+        "label": "Vendor Onboarding Start",
+        "date": recommended_start,
+    },
+    {
+        "column": "rfp_issue",
+        "title": "Vendor Onboarding",
+        "label": "Vendor Onboarding RFP Issued",
+        "date": milestones.get("rfp_issue_start"),
+    },
+    {
+        "column": "rfp_closed",
+        "title": "Vendor Onboarding",
+        "label": "Vendor Onboarding RFP Closed",
+        "date": rfp_closed,
+    },
+    {
+        "column": "onboarding_complete",
+        "title": "Vendor Onboarding",
+        "label": "Vendor Onboarding Complete",
+        "date": milestones.get("onboarding_complete"),
+    },
+    {
+        "column": "construction_complete",
+        "title": "Vendor Onboarding",
+        "label": "Construction Complete",
+        "date": milestones.get("construction_complete", recommended_finish),
+    },
+]
+
+columns = st.columns(len(milestone_cards))
+for col, card in zip(columns, milestone_cards):
+    with col:
+        display_value = format_card_value(card["date"])
+        st.markdown(
+            render_kpi_card(
+                card["title"],
+                card["label"],
+                display_value,
+                MILESTONE_COLORS.get(card["column"]),
+            ),
+            unsafe_allow_html=True,
+        )
+
+milestone_points = [
+    {
+        "label": card["label"],
+        "date": card["date"],
+        "color": MILESTONE_COLORS.get(card["column"]),
+    }
+    for card in milestone_cards
+]
 
 
 st.divider()
 
 result_df = pd.DataFrame(rows)
+# Gantt chart
+render_schedule_gantt(result_df, milestone_points)
+
 # Results Table
 render_styled_table(result_df)
 
