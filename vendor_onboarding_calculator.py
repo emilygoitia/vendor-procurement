@@ -33,7 +33,7 @@ with st.sidebar:
     # Date input
     today_year = date_utils.date.today().year
     if mode == "Start Date → End Date":
-        start_date = st.date_input("Onboarding Start", value=date_utils.date(today_year, 1, 15))
+        start_date = st.date_input("Onboarding Start", value=date_utils.date.today())
         target_end = None
     else:
         target_end = st.date_input("Target Onboard Complete", value=date_utils.date(today_year, 6, 30))
@@ -76,7 +76,7 @@ def forward_schedule(start_date, controls):
             "Step": ctrl["name"],
             "Start": s_start,
             "Finish": s_finish,
-            "Duration (wd)": int(ctrl["days"]),
+            "Duration (work days)": int(ctrl["days"]),
         })
         # Next step starts the day after finish
         current = s_finish
@@ -94,7 +94,7 @@ def backward_schedule(target_end, controls):
             "Step": ctrl["name"],
             "Start": s_start,
             "Finish": current_finish,
-            "Duration (wd)": int(ctrl["days"]),
+            "Duration (work days)": int(ctrl["days"]),
         })
         current_finish = s_start
     # Re‑order to forward sequence for display
@@ -124,9 +124,8 @@ with colC:
 
 st.divider()
 
-# Results Table
 result_df = pd.DataFrame(rows)
-st.dataframe(result_df, hide_index=True, use_container_width=True)
+# Results Table
 render_styled_table(result_df)
 
 # Download
