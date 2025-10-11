@@ -278,6 +278,34 @@ if rfp_closed and milestones.get("info_due") and milestones["info_due"] > rfp_cl
     alerts.append(f"RFP information requests are due on {milestones['info_due']} but the RFP closes on {rfp_closed}. Extend the RFP Issued window or move the due date earlier.")
 if rfp_closed and milestones.get("info_answered") and milestones["info_answered"] > rfp_closed:
     alerts.append(f"RFP information request answers finish on {milestones['info_answered']} but the RFP closes on {rfp_closed}. Adjust durations so answers are complete before closing.")
+if mode == "End Date → Start Recommendation" and recommended_start and recommended_start < date_utils.date.today():
+    shortfall_days = date_utils.workdays_between(recommended_start, date_utils.date.today(), holidays=HOLIDAYS)
+    if shortfall_days is None:
+        shortfall_days = (date_utils.date.today() - recommended_start).days
+    if shortfall_days and shortfall_days > 0:
+        start_str = recommended_start.strftime("%b %d, %Y")
+        today_str = date_utils.date.today().strftime("%b %d, %Y")
+        message = (
+            f"Working backward sets the onboarding start to {start_str}, which is {shortfall_days} working days before today ({today_str}). "
+            "Durations need to be reduced by at least "
+            f"{shortfall_days} working days or the required completion date must move later."
+        )
+        included_steps = [c for c in step_controls if c["include"] and int(c["days"]) > 0]
+        if included_steps:
+            suggestions = []
+            for ctrl in sorted(included_steps, key=lambda x: int(x["days"]), reverse=True):
+                trim = min(shortfall_days, int(ctrl["days"]))
+                if trim <= 0:
+                    continue
+                suggestions.append(f"{ctrl['name']} by {trim} days")
+                if len(suggestions) == 2:
+                    break
+            if suggestions:
+                if len(suggestions) == 1:
+                    message += f" Consider shortening {suggestions[0]}."
+                else:
+                    message += f" Consider shortening {suggestions[0]} or {suggestions[1]}."
+        alerts.append(message)
 for msg in alerts:
     st.error(msg)
 
