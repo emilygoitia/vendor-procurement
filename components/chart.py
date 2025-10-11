@@ -73,7 +73,7 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
         linewidth=1,
         linecolor=colors.MANO_BLUE,
         categoryorder="array",
-        categoryarray=list(reversed(ordered_steps)) if ordered_steps else None,
+        categoryarray=ordered_steps if ordered_steps else None,
     )
     timeline_fig.update_xaxes(showgrid=True, gridcolor="lightgray", linewidth=1, linecolor=colors.MANO_BLUE)
     timeline_fig.update_layout(
