@@ -17,13 +17,9 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
         st.info("Add at least one step to see the schedule timeline.")
         return
 
-    sorted_tasks = (
-        tasks_df.sort_values(by=["Start", "Finish", "Step"], ascending=[True, True, True]).reset_index(drop=True)
-    )
-
     # Build the base timeline with a consistent Mano Blue bar colour.
     timeline_fig = px.timeline(
-        sorted_tasks,
+        tasks_df,
         x_start="Start",
         x_end="Finish",
         y="Step",
@@ -39,51 +35,21 @@ def render_schedule_gantt(tasks_df, milestone_points, milestone_track_label="Mil
     )
 
     # Keep the explicit order of tasks as defined in the dataframe.
-    ordered_steps = list(dict.fromkeys(sorted_tasks["Step"].tolist()))
+    ordered_steps = list(dict.fromkeys(tasks_df["Step"].tolist()))
+    if milestone_points:
+        ordered_steps.append(milestone_track_label)
 
     # Add milestone markers as scatter traces.
     for point in milestone_points:
         milestone_date = point.get("date")
         if not milestone_date:
             continue
-
         label = point.get("label", "Milestone")
         color = point.get("color", colors.MANO_BLUE)
-        align = point.get("align", "finish")
-        step_label = point.get("step")
-
-        matching_rows = None
-        if step_label:
-            matching_rows = sorted_tasks[sorted_tasks["Step"] == step_label]
-        if (matching_rows is None or matching_rows.empty) and align == "start":
-            matching_rows = sorted_tasks[sorted_tasks["Start"] == milestone_date]
-        if (matching_rows is None or matching_rows.empty) and align != "start":
-            matching_rows = sorted_tasks[sorted_tasks["Finish"] == milestone_date]
-        if (matching_rows is None or matching_rows.empty) and align != "start":
-            matching_rows = sorted_tasks[sorted_tasks["Start"] == milestone_date]
-
-        if matching_rows is not None and not matching_rows.empty:
-            if align == "start":
-                step_label = matching_rows.iloc[0]["Step"]
-                marker_x = matching_rows.iloc[0]["Start"]
-            elif align == "finish":
-                step_label = matching_rows.iloc[-1]["Step"]
-                marker_x = matching_rows.iloc[-1]["Finish"]
-            else:
-                step_label = matching_rows.iloc[-1]["Step"]
-                marker_x = milestone_date
-        elif step_label and step_label in ordered_steps:
-            marker_x = milestone_date
-        else:
-            step_label = milestone_track_label
-            marker_x = milestone_date
-            if milestone_track_label not in ordered_steps:
-                ordered_steps.append(milestone_track_label)
-
         timeline_fig.add_trace(
             go.Scatter(
-                x=[marker_x],
-                y=[step_label],
+                x=[milestone_date],
+                y=[milestone_track_label],
                 mode="markers",
                 marker=dict(color=color, size=14, symbol="circle", line=dict(color="#FFFFFF", width=2)),
                 name=label,
