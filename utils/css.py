@@ -151,9 +151,7 @@ def inject_custom_css():
       div[data-testid='stVerticalBlockBorderWrapper']:has(>div>div>div>div>div[data-testid="stMarkdownContainer"]>.styled-slider){{
         padding: 10px;
         border-radius: 0.5rem;
-      }}
-      div[data-testid='stVerticalBlockBorderWrapper']:has(>div>div>div>div>div[data-testid="stMarkdownContainer"]>.styled-slider):nth-child(even){{ 
-        background-color: var(--mano-offwhite);
+        background-color: white;
       }}
       div[data-testid='stVerticalBlockBorderWrapper']:has(>div>div>div>div>div[data-testid="stMarkdownContainer"]>.styled-slider) [data-testid="stVerticalBlock"] {{
         gap: 0;
