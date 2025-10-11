@@ -344,19 +344,40 @@ for col, card in zip(columns, milestone_cards):
             unsafe_allow_html=True,
         )
 
-milestone_points = [
-    {
-        "label": card["label"],
-        "date": card["date"],
-        "color": MILESTONE_COLORS.get(card["column"]),
-    }
-    for card in milestone_cards
-]
+cards_by_column = {card["column"]: card for card in milestone_cards}
+
+result_df = pd.DataFrame(rows)
+
+milestone_points = []
+first_step_name = result_df.iloc[0]["Step"] if not result_df.empty else None
+start_card = cards_by_column.get("start")
+if start_card and start_card.get("date") and first_step_name:
+    milestone_points.append(
+        {
+            "label": start_card["label"],
+            "date": start_card["date"],
+            "color": MILESTONE_COLORS.get("start"),
+            "align": "start",
+            "step": first_step_name,
+        }
+    )
+
+for key in ["rfp_issue", "rfp_closed", "onboarding_complete", "construction_complete"]:
+    card = cards_by_column.get(key)
+    if not card or not card.get("date"):
+        continue
+    milestone_points.append(
+        {
+            "label": card["label"],
+            "date": card["date"],
+            "color": MILESTONE_COLORS.get(card["column"]),
+            "align": "finish",
+        }
+    )
 
 
 st.divider()
 
-result_df = pd.DataFrame(rows)
 # Gantt chart
 render_schedule_gantt(result_df, milestone_points)
 
