@@ -105,8 +105,8 @@ with st.sidebar:
                 due_default = max(0, min(default_days, due_default))
                 due_key = "slider_info_due"
                 if due_key in st.session_state:
-                    st.session_state[due_key] = max(0, min(rfp_issue_span, int(st.session_state[due_key])))
-                    due_initial_value = int(st.session_state[due_key])
+                    stored_due = int(st.session_state[due_key])
+                    due_initial_value = max(0, min(rfp_issue_span, stored_due))
                 else:
                     due_initial_value = min(due_default, rfp_issue_span)
                 info_due_value = render_styled_slider(
@@ -123,8 +123,8 @@ with st.sidebar:
                 answer_default = max(0, min(answered_max, answer_default))
                 answered_key = "slider_info_answered"
                 if answered_key in st.session_state:
-                    st.session_state[answered_key] = max(0, min(answered_max, int(st.session_state[answered_key])))
-                    answered_initial = int(st.session_state[answered_key])
+                    stored_answered = int(st.session_state[answered_key])
+                    answered_initial = max(0, min(answered_max, stored_answered))
                 else:
                     answered_initial = answer_default
                 info_answered_value = render_styled_slider(
