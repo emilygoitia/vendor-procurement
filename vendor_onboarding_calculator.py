@@ -355,7 +355,6 @@ MILESTONE_COLORS = {
 }
 
 MILESTONE_STEP_LABELS = {
-    "rfp_issued": "RFP Open",
     "rfp_open": "RFP Open",
     "rfp_closed": "RFP Open",
     "onboarding_complete": "Bidder Contract Execution",
@@ -368,12 +367,6 @@ milestone_cards = [
         "title": "",
         "label": "Vendor Onboarding Start",
         "date": recommended_start,
-    },
-    {
-        "column": "rfp_issued",
-        "title": "",
-        "label": "Vendor Onboarding RFP Issued",
-        "date": milestones.get("rfp_issue_start"),
     },
     {
         "column": "rfp_open",
@@ -434,14 +427,14 @@ if start_card and start_card.get("date") and first_step_name:
         }
     )
 
-for key in ["rfp_issued", "rfp_open", "rfp_closed", "onboarding_complete", "construction_complete"]:
+for key in ["rfp_open", "rfp_closed", "onboarding_complete", "construction_complete"]:
     card = cards_by_column.get(key)
     if not card or not card.get("date"):
         continue
     step_name = MILESTONE_STEP_LABELS.get(key)
     if step_name not in result_steps:
         step_name = None
-    align = "start" if key == "rfp_issued" else "finish"
+    align = "finish"
     milestone_points.append(
         {
             "label": card["label"],
