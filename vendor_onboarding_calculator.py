@@ -83,7 +83,21 @@ with st.sidebar:
             min_days = int(s.get("min_days", 1))
             max_days = int(s.get("max_days", 60))
             step_size = int(s.get("step", 1))
-            default_days = int(round(s["default_days"] * scale))
+            slider_key = f"slider_{s['key']}"
+
+            if s["key"] == "contract":
+                contract_choice = st.radio(
+                    "Do you already have a contract for negotiating with the selected bidder?",
+                    ["Yes", "No"],
+                    index=0,
+                    key="contract_existing_choice",
+                    horizontal=True,
+                )
+                base_default_days = 40 if contract_choice == "No" else s["default_days"]
+            else:
+                base_default_days = s["default_days"]
+
+            default_days = int(round(base_default_days * scale))
             default_days = max(min_days, min(max_days, default_days))
             if step_size > 1:
                 offset = (default_days - min_days) % step_size
@@ -92,14 +106,28 @@ with st.sidebar:
                     default_days += step_size
                 if default_days < min_days:
                     default_days = min_days
+
+            if s["key"] == "contract":
+                default_tracker_key = "contract_last_default"
+                previous_default = st.session_state.get(default_tracker_key)
+                previous_slider_value = st.session_state.get(slider_key)
+                if (
+                    previous_default is not None
+                    and previous_slider_value is not None
+                    and previous_slider_value == previous_default
+                    and previous_default != default_days
+                ):
+                    st.session_state[slider_key] = default_days
             dur = render_styled_slider(
                 s["name"],
                 min_days,
                 max_days,
                 default_days,
                 step=step_size,
-                key=f"slider_{s['key']}",
+                key=slider_key,
             )
+            if s["key"] == "contract":
+                st.session_state[default_tracker_key] = default_days
             if s["key"] == "rfp_issued":
                 rfp_issue_span = int(dur)
                 due_default = int(round(INFO_REQUEST_DEFAULTS["due"] * scale))
